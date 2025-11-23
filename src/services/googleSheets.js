@@ -351,6 +351,64 @@ class GoogleSheetsService {
     }
   }
 
+  /**
+   * Get a range of values from a Google Sheet
+   * @param {string} sheetId - The Google Sheet ID
+   * @param {string} range - The range to fetch (e.g., 'A3:L' for columns A through L from row 3 onwards)
+   * @param {string} sheetName - Optional sheet name
+   * @returns {Array<Array>} - 2D array of values
+   */
+  async getRange(sheetId, range, sheetName = null) {
+    await this.initialize();
+
+    try {
+      // Get sheet information
+      const sheetInfo = await this.getSheetInfo(sheetId);
+
+      if (!sheetInfo.sheets || sheetInfo.sheets.length === 0) {
+        throw new Error(`Spreadsheet ${sheetId} has no sheets.`);
+      }
+
+      // Determine which sheet to use
+      let targetSheet;
+      if (sheetName) {
+        targetSheet = sheetInfo.sheets.find(
+          (sheet) => sheet.title === sheetName
+        );
+        if (!targetSheet) {
+          throw new Error(
+            `Sheet "${sheetName}" not found in spreadsheet ${sheetId}. Available sheets: ${sheetInfo.sheets
+              .map((s) => s.title)
+              .join(", ")}`
+          );
+        }
+      } else {
+        targetSheet = sheetInfo.sheets[0];
+      }
+
+      const rangeWithSheet = `'${targetSheet.title}'!${range}`;
+
+      logger.debug(
+        `Getting range from sheet ${sheetId}, sheet "${targetSheet.title}", range ${range}`
+      );
+
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: rangeWithSheet,
+      });
+
+      const values = response.data.values || [];
+
+      logger.debug(
+        `Retrieved ${values.length} rows from "${targetSheet.title}"`
+      );
+
+      return values;
+    } catch (error) {
+      logger.error(`Error getting range from ${sheetId}:${range}:`, error);
+      throw error;
+    }
+  }
 }
 
 module.exports = { GoogleSheetsService };
