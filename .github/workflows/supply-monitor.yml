@@ -50,7 +50,7 @@ jobs:
         if: steps.pause-check.outputs.skip != 'true'
         env:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
-          SHEETS_CONFIG: ${{ secrets.SHEETS_CONFIG }}
+          DATABASE_SHEET_ID: ${{ secrets.DATABASE_SHEET_ID }}
           LOG_LEVEL: info
         run: |
           echo "Starting supply status monitor..."

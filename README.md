@@ -25,20 +25,47 @@ Create a Google Cloud project (free):
 
 ### 2. Google Sheets Format
 
-Your sheet must have these cells:
+#### Commander Database Sheet
 
-- **Current Supplies**: A number (e.g., cell B2: `150`)
-- **Daily Consumption**: A number (e.g., cell B3: `5`)
+Create a Google Sheet with a tab named **"Commander Database"** that contains your commander configuration starting from row 3:
+
+| Column | Field               | Description                                                  |
+| ------ | ------------------- | ------------------------------------------------------------ |
+| A      | Commander Name      | The name of the commander/army                               |
+| B      | Sheet URL           | The full Google Sheets URL for this commander's supply sheet |
+| L      | Discord Webhook URL | The Discord webhook URL for notifications                    |
+
+**Example:**
+
+```
+Row 1: [Headers - optional]
+Row 2: [Headers - optional]
+Row 3: "Saraian 1st Army" | "https://docs.google.com/spreadsheets/d/1AbCdEfG.../edit" | ... | "https://discord.com/api/webhooks/123/abc"
+Row 4: "Keltic Raiders"   | "https://docs.google.com/spreadsheets/d/1ZyXwVu.../edit" | ... | "https://discord.com/api/webhooks/456/def"
+```
+
+**Note:** The system will automatically:
+
+- Parse the sheet ID from the URL in column B
+- Use "Sheet1" as the sheet name
+- Use cell C9 for current supplies
+- Use cell C11 for daily consumption
+
+#### Individual Commander Supply Sheets
+
+Each commander's supply sheet (referenced in the Commander Database) must have:
+
+- **Cell C9**: Current Supplies (a number, e.g., `150`)
+- **Cell C11**: Daily Consumption (a number, e.g., `5`)
+
+These cells are hardcoded and used for all commanders.
 
 Example layout:
 
 ```
-A1: Army                    B1: Saraian 1st Army
-A2: Current Supplies        B2: 150
-A3: Daily Consumption       B3: 5
+A9: Current Supplies        C9: 150
+A11: Daily Consumption      C11: 5
 ```
-
-Names & position don't need to match; just so long as you provide the right locations.
 
 ### 3. Discord Webhooks
 
@@ -68,33 +95,33 @@ To get thread id:
 1. Fork this repository
 2. Add these secrets (Settings > Secrets and variables > Actions):
    - `GOOGLE_SERVICE_ACCOUNT_KEY`: Base64-encoded service account JSON
-   - `SHEETS_CONFIG`: JSON configuration (see below)
+   - `DATABASE_SHEET_ID`: The Google Sheet ID of your Commander Database sheet
+
+**To get the Database Sheet ID:**
+
+From your Commander Database Google Sheets URL:
+
+```
+https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz1234567890/edit
+                                       ^^^^^^^^^ This is your sheet ID ^^^^^^^^^
+```
+
+The sheet ID is the long alphanumeric string between `/d/` and `/edit` in the URL.
 
 ### 5. Configuration
 
-Set `SHEETS_CONFIG` secret to JSON like this:
+Configuration is now automatically loaded from your Commander Database Google Sheet. The system will:
 
-```json
-[
-  {
-    "name": "Saraian 1st Army",
-    "sheetId": "1AbCdEfGhIjKlMnOpQrStUvWxYz1234567890",
-    "sheetName": "Supply Tracker",
-    "webhookUrl": "https://discord.com/api/webhooks/123/abc?thread_id=456",
-    "currentSuppliesCell": "B2",
-    "dailyConsumptionCell": "B3"
-  }
-]
-```
+1. Connect to the sheet specified by `DATABASE_SHEET_ID`
+2. Read the "Commander Database" tab
+3. Process each row starting from row 3
+4. Extract commander name (Column A), sheet URL (Column B), and webhook URL (Column L)
+5. Automatically configure each commander with:
+   - Sheet name: "Sheet1"
+   - Current supplies cell: C9
+   - Daily consumption cell: C11
 
-**Configuration fields:**
-
-- `name`: Army name for notifications
-- `sheetId`: Google Sheet ID (from URL: `/d/{this-part}/edit`)
-- `sheetName`: Sheet tab name (optional, uses first tab if omitted)
-- `webhookUrl`: Discord webhook URL (with optional thread_id)
-- `currentSuppliesCell`: Cell containing current supplies (e.g., "B2")
-- `dailyConsumptionCell`: Cell containing daily consumption (e.g., "B3")
+**No manual JSON configuration needed!** Just maintain your Commander Database sheet and the system will automatically discover and process all commanders.
 
 ## Timing Configuration
 
@@ -177,51 +204,19 @@ The bot sends Discord embeds with supply status:
 - **Red** (🚨): 1-3 days remaining
 - **Critical** (🚨): 0 days remaining
 
-## Multiple Army Examples
+## Adding Multiple Commanders
 
-### Separate Sheets
+To monitor multiple commanders, simply add more rows to your Commander Database sheet. Each row (starting from row 3) represents a different commander/army:
 
-```json
-[
-  {
-    "name": "Saraian 1st Army",
-    "sheetId": "1AbCdEfGhIjKlMnOpQrStUvWxYz123",
-    "webhookUrl": "https://discord.com/api/webhooks/111/aaa",
-    "currentSuppliesCell": "B2",
-    "dailyConsumptionCell": "B3"
-  },
-  {
-    "name": "Keltic Raiders",
-    "sheetId": "1ZyXwVuTsRqPoNmLkJiHgFe456",
-    "webhookUrl": "https://discord.com/api/webhooks/222/bbb",
-    "currentSuppliesCell": "B2",
-    "dailyConsumptionCell": "B3"
-  }
-]
-```
+**Example Commander Database:**
 
-### Multiple Tabs, Same Sheet
+| A (Name)         | B (Sheet URL)                                   | ... | L (Webhook URL)                                        |
+| ---------------- | ----------------------------------------------- | --- | ------------------------------------------------------ |
+| Saraian 1st Army | https://docs.google.com/spreadsheets/d/1AbC.../ | ... | https://discord.com/api/webhooks/111/aaa               |
+| Keltic Raiders   | https://docs.google.com/spreadsheets/d/1ZyX.../ | ... | https://discord.com/api/webhooks/222/bbb               |
+| Northern Legion  | https://docs.google.com/spreadsheets/d/1DeF.../ | ... | https://discord.com/api/webhooks/333/ccc?thread_id=444 |
 
-```json
-[
-  {
-    "name": "Saraian 1st Army",
-    "sheetId": "1AbCdEfGhIjKlMnOpQrStUvWxYz123",
-    "sheetName": "1st Army",
-    "webhookUrl": "https://discord.com/api/webhooks/111/aaa?thread_id=333",
-    "currentSuppliesCell": "B2",
-    "dailyConsumptionCell": "B3"
-  },
-  {
-    "name": "Saraian 2nd Army",
-    "sheetId": "1AbCdEfGhIjKlMnOpQrStUvWxYz123",
-    "sheetName": "2nd Army",
-    "webhookUrl": "https://discord.com/api/webhooks/111/aaa?thread_id=444",
-    "currentSuppliesCell": "B2",
-    "dailyConsumptionCell": "B3"
-  }
-]
-```
+The system will automatically process all rows with complete data (name, sheet URL, and webhook URL).
 
 ## Security & Privacy
 

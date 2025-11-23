@@ -1,26 +1,115 @@
-const fs = require("fs").promises;
-const path = require("path");
+const { GoogleSheetsService } = require("../services/googleSheets");
 const { logger } = require("./logger");
 
+/**
+ * Parse a Google Sheets URL to extract the sheet ID
+ * @param {string} url - The Google Sheets URL
+ * @returns {string} - The sheet ID
+ */
+function parseSheetIdFromUrl(url) {
+  // Google Sheets URLs have the format:
+  // https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit#gid=0
+  // or
+  // https://docs.google.com/spreadsheets/d/{SHEET_ID}
+
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+
+  if (!match || !match[1]) {
+    throw new Error(`Invalid Google Sheets URL: ${url}`);
+  }
+
+  return match[1];
+}
+
+/**
+ * Load configuration from the Commander Database Google Sheet
+ * @returns {Promise<Array>} - Array of sheet configurations
+ */
 async function loadConfig() {
   try {
-    // Check if we're running in GitHub Actions with environment variable config
-    if (process.env.SHEETS_CONFIG) {
-      logger.info("Loading configuration from environment variable");
-      return JSON.parse(process.env.SHEETS_CONFIG);
+    // Get the database sheet ID from environment variable
+    const databaseSheetId = process.env.DATABASE_SHEET_ID;
+
+    if (!databaseSheetId) {
+      throw new Error("DATABASE_SHEET_ID environment variable is required");
     }
 
-    // Load from config file
-    const configPath = process.env.SHEETS_CONFIG_PATH || "./config/sheets.json";
-    const fullPath = path.resolve(configPath);
+    logger.info(
+      `Loading configuration from database sheet: ${databaseSheetId}`
+    );
 
-    logger.info(`Loading configuration from file: ${fullPath}`);
+    // Initialize Google Sheets service
+    const sheetsService = new GoogleSheetsService();
+    await sheetsService.initialize();
 
-    const configFile = await fs.readFile(fullPath, "utf8");
-    const config = JSON.parse(configFile);
+    // Fetch data from Commander Database sheet, starting from row 3
+    // Columns: A = name, B = sheet URL, L = webhook URL
+    const rows = await sheetsService.getRange(
+      databaseSheetId,
+      "A3:L",
+      "Commander Database"
+    );
 
-    // Validate configuration
+    if (!rows || rows.length === 0) {
+      throw new Error("No commander data found in Commander Database sheet");
+    }
+
+    // Build configuration array
+    const config = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 3; // Actual row number in the sheet
+
+      // Column A (index 0) = name
+      const name = row[0];
+
+      // Column B (index 1) = sheet URL
+      const sheetUrl = row[1];
+
+      // Column L (index 11) = webhook URL
+      const webhookUrl = row[11];
+
+      // Skip rows that don't have all required fields
+      if (!name || !sheetUrl || !webhookUrl) {
+        logger.debug(
+          `Skipping row ${rowNumber}: missing required fields (name: ${!!name}, sheetUrl: ${!!sheetUrl}, webhookUrl: ${!!webhookUrl})`
+        );
+        continue;
+      }
+
+      try {
+        // Parse the sheet ID from the URL
+        const sheetId = parseSheetIdFromUrl(sheetUrl);
+
+        // Build the configuration object with hardcoded cell addresses
+        config.push({
+          name: name.trim(),
+          sheetId: sheetId,
+          sheetName: "Sheet1",
+          webhookUrl: webhookUrl.trim(),
+          currentSuppliesCell: "C9",
+          dailyConsumptionCell: "C11",
+        });
+
+        logger.debug(`Added configuration for: ${name}`);
+      } catch (error) {
+        logger.warn(`Skipping row ${rowNumber} (${name}): ${error.message}`);
+      }
+    }
+
+    if (config.length === 0) {
+      throw new Error(
+        "No valid commander configurations found in Commander Database sheet"
+      );
+    }
+
+    // Validate the configuration
     validateConfig(config);
+
+    logger.info(
+      `Successfully loaded configuration for ${config.length} commanders`
+    );
 
     return config;
   } catch (error) {
@@ -92,4 +181,5 @@ module.exports = {
   loadConfig,
   validateConfig,
   isValidCellAddress,
+  parseSheetIdFromUrl,
 };
