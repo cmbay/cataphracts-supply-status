@@ -64,11 +64,11 @@ async function loadConfig() {
       // Column A (index 0) = name
       const name = row[0];
 
-      // Column B (index 1) = sheet URL
-      const sheetUrl = row[1];
+      // Column C (index 2) = sheet URL
+      const sheetUrl = row[2];
 
-      // Column L (index 11) = webhook URL
-      const webhookUrl = row[11];
+      // Column M (index 12) = webhook URL
+      const webhookUrl = row[12];
 
       // Skip rows that don't have all required fields
       if (!name || !sheetUrl || !webhookUrl) {
