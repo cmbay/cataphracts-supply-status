@@ -46,7 +46,7 @@ async function loadConfig() {
     // Columns: A = name, B = sheet URL, L = webhook URL
     const rows = await sheetsService.getRange(
       databaseSheetId,
-      "A3:L",
+      "A3:M",
       "Commander Database"
     );
 
